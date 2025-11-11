@@ -1,14 +1,56 @@
 body {
     margin: 0;
     padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     height: 100vh;
+    width: 100vw;
     background-color: #333;
+    overflow: hidden;
+    font-family: 'Orbitron', sans-serif;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+#gameTitle {
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    padding: 20px 0;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(16, 153, 187, 0.8), 0 0 40px rgba(16, 153, 187, 0.4);
+    letter-spacing: 2px;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 #gameContainer {
-    width: 800px;
-    height: 600px;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 0;
+}
+
+#gameFooter {
+    color: #aaa;
+    font-size: 0.9rem;
+    margin: 0;
+    padding: 15px 0;
+    text-align: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+#gameFooter a {
+    color: #1099bb;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+#gameFooter a:hover {
+    color: #00d4ff;
+    text-decoration: underline;
 }

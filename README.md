@@ -1,12 +1,10 @@
 # Simple Browser Game
-
 This is a simple browser-based game created with HTML5 and PixiJS. It features a red circle that can be moved around the screen using the WASD keys.
 
 ## Features
 - Smooth 60 FPS rendering using PixiJS
 - WASD keyboard controls
 - Collision detection with screen boundaries
-- No build step required
 
 ## How to Run
 1. Simply open the `index.html` file in a modern web browser

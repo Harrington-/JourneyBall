@@ -1,12 +1,53 @@
-// Initialize PIXI Application
+// Define logical game dimensions (16:9 aspect ratio)
+const GAME_WIDTH = 1920;
+const GAME_HEIGHT = 1080;
+const ASPECT_RATIO = GAME_WIDTH / GAME_HEIGHT;
+
+// Initialize PIXI Application with fixed logical size
 const app = new PIXI.Application({
-    width: 800,
-    height: 600,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
     backgroundColor: 0x1099bb,
     resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
 });
 
 document.getElementById('gameContainer').appendChild(app.view);
+
+// Function to resize canvas to fit window while maintaining aspect ratio
+function resizeCanvas() {
+    const gameContainer = document.getElementById('gameContainer');
+    const containerWidth = gameContainer.clientWidth;
+    const containerHeight = gameContainer.clientHeight;
+    
+    let displayWidth = containerWidth;
+    let displayHeight = containerHeight;
+    
+    // Calculate dimensions to fit within container while maintaining aspect ratio
+    const windowAspectRatio = containerWidth / containerHeight;
+    
+    if (windowAspectRatio > ASPECT_RATIO) {
+        // Container is wider, fit to height
+        displayHeight = containerHeight;
+        displayWidth = displayHeight * ASPECT_RATIO;
+    } else {
+        // Container is taller, fit to width
+        displayWidth = containerWidth;
+        displayHeight = displayWidth / ASPECT_RATIO;
+    }
+    
+    // Apply scaling to the canvas
+    app.view.style.width = displayWidth + 'px';
+    app.view.style.height = displayHeight + 'px';
+}
+
+// Initial resize
+resizeCanvas();
+
+// Make canvas responsive to window resizing
+window.addEventListener('resize', () => {
+    resizeCanvas();
+});
 
 // Create a circle
 const circle = new PIXI.Graphics();
