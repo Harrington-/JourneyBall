@@ -187,13 +187,13 @@ function generateDefaultLevel() {
     const rightX1 = 1370;
     const rightX2 = 1670;
     
-    let currentY = 900;
-    const yStep = 100; // 100px vertical spacing between platforms
+    let currentY = 950;
+    const yStep = 75; // 100px vertical spacing between platforms
     const maxInitialSlope = 20; // Reduced from 80 to 20
     
     for (let i = 0; i < 240; i++) {
         // Calculate intensity multiplier based on height (increases as we go up)
-        const intensityMultiplier = 1 + (i * 0.03); // Reduced from 0.08 to 0.03
+        const intensityMultiplier = 1 + (i * 0.015); // Reduced from 0.08 to 0.03
         const currentMaxSlope = maxInitialSlope * intensityMultiplier;
         
         // Determine platform pattern - alternating sides
