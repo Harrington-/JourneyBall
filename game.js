@@ -188,13 +188,20 @@ function generateDefaultLevel() {
     const rightX2 = 1670;
     
     let currentY = 950;
-    const yStep = 75; // 100px vertical spacing between platforms
-    const maxInitialSlope = 20; // Reduced from 80 to 20
-    
-    for (let i = 0; i < 240; i++) {
-        // Calculate intensity multiplier based on height (increases as we go up)
-        const intensityMultiplier = 1 + (i * 0.015); // Reduced from 0.08 to 0.03
-        const currentMaxSlope = maxInitialSlope * intensityMultiplier;
+    const yStep = 75; // Vertical spacing between platforms
+    const baseSlope = 6; // Starting max slope magnitude (pixels)
+    const maxSlopeCap = 50; // Absolute cap for slope magnitude late game
+    // Derive S-curve parameters from current loop logic (100000 / yStep)
+    const totalCount = Math.floor(100000 / yStep);
+    const curveMidpoint = Math.floor(totalCount * 0.4); // inflection ~40% up the climb
+    const transitionSpan = Math.max(1, Math.floor(totalCount * 0.25)); // width of ramp region
+    const curveSteepness = 1 / transitionSpan; // scale k so ramp width is consistent
+
+    // S-curve (logistic) difficulty: difficulty(i) = cap * (1 / (1 + e^{-k(i-mid)}))
+    // We'll scale from baseSlope upward, then clamp.
+    for (let i = 0; i < 100000/yStep; i++) {
+        const logistic = 1 / (1 + Math.exp(-curveSteepness * (i - curveMidpoint))); // 0..1
+        const currentMaxSlope = Math.min(baseSlope + logistic * (maxSlopeCap - baseSlope), maxSlopeCap);
         
         // Determine platform pattern - alternating sides
         const side = i % 3; // 0 = center, 1 = left, 2 = right
@@ -242,6 +249,13 @@ rightWall.moveTo(GAME_WIDTH - BALL_RADIUS/2, -WALL_HEIGHT);
 rightWall.lineTo(GAME_WIDTH - BALL_RADIUS/2, GAME_HEIGHT + 20);
 world.addChild(rightWall);
 
+// Create a ceiling connecting the tops of the walls
+const ceiling = new PIXI.Graphics();
+ceiling.lineStyle(BALL_RADIUS, EDGE_COLOR);
+ceiling.moveTo(BALL_RADIUS/2, -WALL_HEIGHT);
+ceiling.lineTo(GAME_WIDTH - BALL_RADIUS/2, -WALL_HEIGHT);
+world.addChild(ceiling);
+
 // Add permanent walls to platforms array for collision
 platforms.push({
     x1: BALL_RADIUS/2,
@@ -261,6 +275,17 @@ platforms.push({
     thickness: BALL_RADIUS,
     type: 'edge',
     graphics: rightWall
+});
+
+// Add ceiling to platforms for collision
+platforms.push({
+    x1: BALL_RADIUS/2,
+    y1: -WALL_HEIGHT,
+    x2: GAME_WIDTH - BALL_RADIUS/2,
+    y2: -WALL_HEIGHT,
+    thickness: BALL_RADIUS,
+    type: 'edge',
+    graphics: ceiling
 });
 
 // Resolve circle vs line segment collision
