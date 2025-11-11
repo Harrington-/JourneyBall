@@ -154,13 +154,13 @@ const defaultLevel = `# Level 1 - Perimeter
 0,0,20,1080,edge
 1900,0,20,1080,edge
 # Platforms
-960,900,300,20,platform
-400,750,300,20,platform
-1520,750,300,20,platform
-960,600,300,20,platform
-400,450,300,20,platform
-1520,450,300,20,platform
-960,300,300,20,platform`;
+810,900,300,20,platform
+250,750,300,20,platform
+1370,750,300,20,platform
+810,600,300,20,platform
+250,450,300,20,platform
+1370,450,300,20,platform
+810,300,300,20,platform`;
 
 // Load the default level
 loadLevelFromCSV(defaultLevel);
