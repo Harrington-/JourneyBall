@@ -10,7 +10,6 @@ const ACCELERATION = 0.8;
 const MAX_VELOCITY_X = 12;
 const JUMP_STRENGTH = 16;
 const BALL_RADIUS = 20;
-const RESTITUTION = 0.3; // bounce factor (0 = no bounce, 1 = perfect elastic)
 
 // Gravity direction for debugging (1 = down, -1 = up)
 let gravityDirection = 1;
@@ -68,9 +67,7 @@ window.addEventListener('resize', () => {
 const ballPhysics = {
     velocityX: 0,
     velocityY: 0,
-    isJumping: false,
-    isGrounded: false,
-    groundY: GAME_HEIGHT - BALL_RADIUS - 50 // Platform at bottom
+    isGrounded: false
 };
 
 // Score tracking
@@ -82,9 +79,7 @@ const bestHeightDisplay = document.getElementById('bestHeight');
 
 // Camera properties
 const camera = {
-    y: 0,
-    targetY: 0,
-    smoothing: 0.001
+    y: 0
 };
 
 // Create a world container that will hold everything (for camera control)
@@ -166,7 +161,7 @@ function loadLevelFromCSV(csvData) {
 }
 
 // Function to generate random slope with increasing intensity
-function generateRandomSlope(baseY, maxSlope) {
+function generateRandomSlope(maxSlope) {
     // Random value between -1 and 1, then multiply by maxSlope
     const randomFactor = (Math.random() * 2 - 1);
     return Math.round(randomFactor * maxSlope);
@@ -211,13 +206,13 @@ function generateDefaultLevel() {
             level += `${centerX1},${currentY},${centerX2},${currentY},20,platform\n`;
         } else if (side === 1) {
             // Left platform with random slope
-            const leftSlope = generateRandomSlope(currentY, currentMaxSlope);
+            const leftSlope = generateRandomSlope(currentMaxSlope);
             const leftY1 = currentY + leftSlope;
             const leftY2 = currentY - leftSlope;
             level += `${leftX1},${leftY1},${leftX2},${leftY2},20,platform\n`;
         } else {
             // Right platform with random slope
-            const rightSlope = generateRandomSlope(currentY, currentMaxSlope);
+            const rightSlope = generateRandomSlope(currentMaxSlope);
             const rightY1 = currentY - rightSlope;
             const rightY2 = currentY + rightSlope;
             level += `${rightX1},${rightY1},${rightX2},${rightY2},20,platform\n`;
@@ -393,7 +388,7 @@ window.addEventListener('keyup', (e) => {
 app.ticker.add(() => {
     // Apply gravity
     ballPhysics.velocityY += GRAVITY * gravityDirection;
-
+    ballPhysics.velocityY = Math.min(Math.max(ballPhysics.velocityY, -30), 30); // Clamp vertical speed
     // Apply friction and momentum to horizontal movement (only when grounded)
     if (ballPhysics.isGrounded) {
         if (keys.a) {
