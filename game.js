@@ -63,19 +63,22 @@ window.addEventListener('resize', () => {
     resizeCanvas();
 });
 
-// Save state when page unloads if ball is falling
+// Always save state when page unloads (for refresh persistence)
 window.addEventListener('beforeunload', (e) => {
-    if (!ballPhysics.isGrounded) {
-        // Save current state to sessionStorage
-        const state = {
-            x: circle.x,
-            y: circle.y,
-            velocityX: ballPhysics.velocityX,
-            velocityY: ballPhysics.velocityY,
-            seed: levelSeed
-        };
-        sessionStorage.setItem('journeyBallState', JSON.stringify(state));
+    // Don't save if this is a manual reset
+    if (sessionStorage.getItem('journeyBallReset') === 'true') {
+        return;
     }
+    
+    // Save current state to sessionStorage
+    const state = {
+        x: circle.x,
+        y: circle.y,
+        velocityX: ballPhysics.velocityX,
+        velocityY: ballPhysics.velocityY,
+        seed: levelSeed
+    };
+    sessionStorage.setItem('journeyBallState', JSON.stringify(state));
 });
 
 // Ball physics properties
@@ -85,12 +88,13 @@ const ballPhysics = {
     isGrounded: false
 };
 
-// Score tracking
-let bestHeight = 0;
+// Score tracking - restore from sessionStorage if available
+let bestHeight = parseInt(sessionStorage.getItem('journeyBallBestHeight')) || 0;
 
 // Get DOM elements for score display
 const currentHeightDisplay = document.getElementById('currentHeight');
 const bestHeightDisplay = document.getElementById('bestHeight');
+bestHeightDisplay.textContent = bestHeight; // Display restored high score
 
 // Camera properties
 const camera = {
@@ -116,7 +120,15 @@ circle.addChild(ballShape);
 // Set initial position (or restore from sessionStorage if falling)
 let levelSeed;
 let wasRestored = false;
-const savedBallState = sessionStorage.getItem('journeyBallState');
+
+// Check if this is a manual reset
+const isReset = sessionStorage.getItem('journeyBallReset') === 'true';
+if (isReset) {
+    sessionStorage.removeItem('journeyBallReset');
+    sessionStorage.removeItem('journeyBallState');
+}
+
+const savedBallState = !isReset ? sessionStorage.getItem('journeyBallState') : null;
 if (savedBallState) {
     const state = JSON.parse(savedBallState);
     circle.x = state.x;
@@ -125,7 +137,7 @@ if (savedBallState) {
     ballPhysics.velocityY = state.velocityY;
     levelSeed = state.seed;
     wasRestored = true;
-    sessionStorage.removeItem('journeyBallState'); // Clear after restore
+    // Don't clear sessionStorage here - let 'R' key handle that
 } else {
     circle.x = GAME_WIDTH / 2;
     circle.y = 1000;
@@ -135,8 +147,8 @@ if (savedBallState) {
 // Add circle to world
 world.addChild(circle);
 
-// Show "Still Falling" message if state was restored
-if (wasRestored) {
+// Show "Still Falling" message if state was restored and ball isn't grounded
+if (wasRestored && (ballPhysics.velocityY !== 0)) {
     const message = new PIXI.Text('NOPE! Still Falling! HA!', {
         fontFamily: 'Arial',
         fontSize: 72,
@@ -447,6 +459,7 @@ window.addEventListener('keydown', (e) => {
     } else if (key === 'r') {
         // Reset game (only if grounded)
         if (ballPhysics.isGrounded) {
+            sessionStorage.setItem('journeyBallReset', 'true');
             sessionStorage.removeItem('journeyBallState');
             location.reload();
         }
@@ -522,6 +535,7 @@ app.ticker.add(() => {
     if (currentHeight > bestHeight) {
         bestHeight = currentHeight;
         bestHeightDisplay.textContent = bestHeight;
+        sessionStorage.setItem('journeyBallBestHeight', bestHeight.toString());
     }
 
     // Handle jumping (after collision checks so isGrounded is accurate)
