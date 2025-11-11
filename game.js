@@ -63,6 +63,26 @@ window.addEventListener('resize', () => {
     resizeCanvas();
 });
 
+// Intercept page refresh/close attempts when ball is falling
+window.addEventListener('beforeunload', (e) => {
+    if (!ballPhysics.isGrounded) {
+        // Save current state to sessionStorage
+        const state = {
+            x: circle.x,
+            y: circle.y,
+            velocityX: ballPhysics.velocityX,
+            velocityY: ballPhysics.velocityY,
+            seed: levelSeed
+        };
+        sessionStorage.setItem('journeyBallState', JSON.stringify(state));
+        
+        // Show "You're Still Falling" message
+        e.preventDefault();
+        e.returnValue = "You're Still Falling";
+        return "You're Still Falling";
+    }
+});
+
 // Ball physics properties
 const ballPhysics = {
     velocityX: 0,
@@ -98,12 +118,58 @@ ballShape.moveTo(0, 0);
 ballShape.lineTo(0, -BALL_RADIUS);
 circle.addChild(ballShape);
 
-// Set initial position
-circle.x = GAME_WIDTH / 2;
-circle.y = 1000;
+// Set initial position (or restore from sessionStorage if falling)
+let levelSeed;
+let wasRestored = false;
+const savedBallState = sessionStorage.getItem('journeyBallState');
+if (savedBallState) {
+    const state = JSON.parse(savedBallState);
+    circle.x = state.x;
+    circle.y = state.y;
+    ballPhysics.velocityX = state.velocityX;
+    ballPhysics.velocityY = state.velocityY;
+    levelSeed = state.seed;
+    wasRestored = true;
+    sessionStorage.removeItem('journeyBallState'); // Clear after restore
+} else {
+    circle.x = GAME_WIDTH / 2;
+    circle.y = 1000;
+    levelSeed = Math.floor(Math.random() * 1000000);
+}
 
 // Add circle to world
 world.addChild(circle);
+
+// Show "Still Falling" message if state was restored
+if (wasRestored) {
+    const message = new PIXI.Text('NOPE! Still Falling! HA!', {
+        fontFamily: 'Arial',
+        fontSize: 72,
+        fontWeight: 'bold',
+        fill: 0xff0000,
+        stroke: 0xffffff,
+        strokeThickness: 6,
+        dropShadow: true,
+        dropShadowColor: 0x000000,
+        dropShadowBlur: 8,
+        dropShadowDistance: 4
+    });
+    message.anchor.set(0.5);
+    message.x = GAME_WIDTH / 2;
+    message.y = GAME_HEIGHT / 2;
+    app.stage.addChild(message); // Add to stage, not world (so it doesn't move with camera)
+    
+    // Fade out and remove after 2 seconds
+    setTimeout(() => {
+        const fadeOut = setInterval(() => {
+            message.alpha -= 0.05;
+            if (message.alpha <= 0) {
+                clearInterval(fadeOut);
+                app.stage.removeChild(message);
+            }
+        }, 30);
+    }, 2000);
+}
 
 // Platforms array to store collision data
 const platforms = [];
@@ -160,15 +226,30 @@ function loadLevelFromCSV(csvData) {
     }
 }
 
+// Seeded random number generator (mulberry32)
+function seededRandom(seed) {
+    return function() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// Global RNG instance (will be set with seed)
+let rng = Math.random;
+
 // Function to generate random slope with increasing intensity
 function generateRandomSlope(maxSlope) {
     // Random value between -1 and 1, then multiply by maxSlope
-    const randomFactor = (Math.random() * 2 - 1);
+    const randomFactor = (rng() * 2 - 1);
     return Math.round(randomFactor * maxSlope);
 }
 
 // Generate default level with random slopes
-function generateDefaultLevel() {
+function generateDefaultLevel(seed) {
+    // Initialize seeded RNG
+    rng = seededRandom(seed);
     let level = `# Level 1 - Random slopes with increasing intensity
 # Bottom floor
 0,1125,1920,1125,50,edge
@@ -224,8 +305,8 @@ function generateDefaultLevel() {
     return level;
 }
 
-// Default level (generated with random slopes)
-const defaultLevel = generateDefaultLevel();
+// Default level (generated with seeded random slopes - seed set earlier)
+const defaultLevel = generateDefaultLevel(levelSeed);
 
 // Load the default level
 loadLevelFromCSV(defaultLevel);
@@ -368,6 +449,12 @@ window.addEventListener('keydown', (e) => {
     } else if (key === 'u') {
         // Secret hotkey to reverse gravity
         gravityDirection *= -1;
+    } else if (key === 'r') {
+        // Reset game (only if grounded)
+        if (ballPhysics.isGrounded) {
+            sessionStorage.removeItem('journeyBallState');
+            location.reload();
+        }
     }
 });
 
@@ -389,6 +476,7 @@ app.ticker.add(() => {
     // Apply gravity
     ballPhysics.velocityY += GRAVITY * gravityDirection;
     ballPhysics.velocityY = Math.min(Math.max(ballPhysics.velocityY, -30), 30); // Clamp vertical speed
+
     // Apply friction and momentum to horizontal movement (only when grounded)
     if (ballPhysics.isGrounded) {
         if (keys.a) {
