@@ -105,7 +105,7 @@ circle.addChild(ballShape);
 
 // Set initial position
 circle.x = GAME_WIDTH / 2;
-circle.y = GAME_HEIGHT / 2;
+circle.y = 1000;
 
 // Add circle to world
 world.addChild(circle);
@@ -113,15 +113,13 @@ world.addChild(circle);
 // Platforms array to store collision data
 const platforms = [];
 
-// CSV Level Format:
-// x,y,width,height,type
-// type: "platform" or "edge"
+// CSV Level Format (line-based):
+// x1,y1,x2,y2,thickness,type
+// type: "platform" or "edge" or "slope"
 // Example CSV for level 1:
-// 0,1030,1920,50,edge
-// 960,900,300,20,platform
-// 400,750,300,20,platform
-// 1520,750,300,20,platform
-// 960,600,300,20,platform
+// 0,1030,1920,1030,50,edge
+// 810,900,1110,900,20,platform
+// 250,750,550,750,20,platform
 
 // Level loader function
 function loadLevelFromCSV(csvData) {
@@ -137,129 +135,178 @@ function loadLevelFromCSV(csvData) {
         if (line.trim() === '' || line.trim().startsWith('#')) continue; // Skip empty lines and comments
         
         const parts = line.split(',').map(p => p.trim());
-        if (parts.length < 5) continue;
+        if (parts.length < 6) continue;
         
-        const x = parseFloat(parts[0]);
-        const y = parseFloat(parts[1]);
-        const width = parseFloat(parts[2]);
-        const height = parseFloat(parts[3]);
-        const type = parts[4];
+        const x1 = parseFloat(parts[0]);
+        const y1 = parseFloat(parts[1]);
+        const x2 = parseFloat(parts[2]);
+        const y2 = parseFloat(parts[3]);
+        const thickness = parseFloat(parts[4]);
+        const type = parts[5];
         
-        // Create platform graphics
+        // Create platform graphics as a line segment with thickness
         const platformGraphics = new PIXI.Graphics();
-        platformGraphics.beginFill(EDGE_COLOR);
-        platformGraphics.drawRect(x, y, width, height);
-        platformGraphics.endFill();
+        platformGraphics.lineStyle(thickness, EDGE_COLOR);
+        platformGraphics.moveTo(x1, y1);
+        platformGraphics.lineTo(x2, y2);
         
         world.addChild(platformGraphics);
         
         // Store platform collision data
         platforms.push({
-            x: x,
-            y: y,
-            width: width,
-            height: height,
+            x1: x1,
+            y1: y1,
+            x2: x2,
+            y2: y2,
+            thickness: thickness,
             type: type,
             graphics: platformGraphics
         });
     }
 }
 
-// Default level (perimeter platforms)
-const defaultLevel = `# Level 1 - Perimeter
-0,1030,1920,50,edge
-0,0,20,1080,edge
-1900,0,20,1080,edge
-# Platforms
-810,900,300,20,platform
-250,750,300,20,platform
-1370,750,300,20,platform
-810,600,300,20,platform
-250,450,300,20,platform
-1370,450,300,20,platform
-810,300,300,20,platform
-250,150,300,20,platform
-1370,150,300,20,platform
-810,0,300,20,platform
-250,-150,300,20,platform
-1370,-150,300,20,platform
-810,-300,300,20,platform
-250,-450,300,20,platform
-1370,-450,300,20,platform
-810,-600,300,20,platform
-250,-750,300,20,platform
-1370,-750,300,20,platform
-810,-900,300,20,platform
-250,-1050,300,20,platform
-1370,-1050,300,20,platform
-810,-1200,300,20,platform
-250,-1350,300,20,platform
-1370,-1350,300,20,platform
-810,-1500,300,20,platform
-250,-1650,300,20,platform
-1370,-1650,300,20,platform
-810,-1800,300,20,platform
-250,-1950,300,20,platform
-1370,-1950,300,20,platform
-810,-2100,300,20,platform`;
+// Function to generate random slope with increasing intensity
+function generateRandomSlope(baseY, maxSlope) {
+    // Random value between -1 and 1, then multiply by maxSlope
+    const randomFactor = (Math.random() * 2 - 1);
+    return Math.round(randomFactor * maxSlope);
+}
+
+// Generate default level with random slopes
+function generateDefaultLevel() {
+    let level = `# Level 1 - Random slopes with increasing intensity
+# Bottom floor
+0,1125,1920,1125,50,edge
+# Platforms (x1,y1,x2,y2,thickness,type)
+`;
+    
+    const centerX1 = 810;
+    const centerX2 = 1110;
+    const leftX1 = 250;
+    const leftX2 = 550;
+    const rightX1 = 1370;
+    const rightX2 = 1670;
+    
+    let currentY = 900;
+    const yStep = 100; // 100px vertical spacing between platforms
+    const maxInitialSlope = 20; // Reduced from 80 to 20
+    
+    for (let i = 0; i < 240; i++) {
+        // Calculate intensity multiplier based on height (increases as we go up)
+        const intensityMultiplier = 1 + (i * 0.03); // Reduced from 0.08 to 0.03
+        const currentMaxSlope = maxInitialSlope * intensityMultiplier;
+        
+        // Determine platform pattern - alternating sides
+        const side = i % 3; // 0 = center, 1 = left, 2 = right
+        
+        if (side === 0) {
+            // Center platform (always flat)
+            level += `${centerX1},${currentY},${centerX2},${currentY},20,platform\n`;
+        } else if (side === 1) {
+            // Left platform with random slope
+            const leftSlope = generateRandomSlope(currentY, currentMaxSlope);
+            const leftY1 = currentY + leftSlope;
+            const leftY2 = currentY - leftSlope;
+            level += `${leftX1},${leftY1},${leftX2},${leftY2},20,platform\n`;
+        } else {
+            // Right platform with random slope
+            const rightSlope = generateRandomSlope(currentY, currentMaxSlope);
+            const rightY1 = currentY - rightSlope;
+            const rightY2 = currentY + rightSlope;
+            level += `${rightX1},${rightY1},${rightX2},${rightY2},20,platform\n`;
+        }
+        
+        currentY -= yStep;
+    }
+    
+    return level;
+}
+
+// Default level (generated with random slopes)
+const defaultLevel = generateDefaultLevel();
 
 // Load the default level
 loadLevelFromCSV(defaultLevel);
 
-// Create permanent vertical walls that extend infinitely
+// Create permanent vertical walls that extend infinitely (as lines)
 const WALL_HEIGHT = 100000; // Very tall walls
 const leftWall = new PIXI.Graphics();
-leftWall.beginFill(EDGE_COLOR);
-leftWall.drawRect(0, -WALL_HEIGHT, BALL_RADIUS, WALL_HEIGHT + GAME_HEIGHT);
-leftWall.endFill();
+leftWall.lineStyle(BALL_RADIUS, EDGE_COLOR);
+leftWall.moveTo(BALL_RADIUS/2, -WALL_HEIGHT);
+leftWall.lineTo(BALL_RADIUS/2, GAME_HEIGHT + 20);
 world.addChild(leftWall);
 
 const rightWall = new PIXI.Graphics();
-rightWall.beginFill(EDGE_COLOR);
-rightWall.drawRect(GAME_WIDTH - BALL_RADIUS, -WALL_HEIGHT, BALL_RADIUS, WALL_HEIGHT + GAME_HEIGHT);
-rightWall.endFill();
+rightWall.lineStyle(BALL_RADIUS, EDGE_COLOR);
+rightWall.moveTo(GAME_WIDTH - BALL_RADIUS/2, -WALL_HEIGHT);
+rightWall.lineTo(GAME_WIDTH - BALL_RADIUS/2, GAME_HEIGHT + 20);
 world.addChild(rightWall);
 
 // Add permanent walls to platforms array for collision
 platforms.push({
-    x: 0,
-    y: -WALL_HEIGHT,
-    width: BALL_RADIUS,
-    height: WALL_HEIGHT + GAME_HEIGHT,
+    x1: BALL_RADIUS/2,
+    y1: -WALL_HEIGHT,
+    x2: BALL_RADIUS/2,
+    y2: GAME_HEIGHT,
+    thickness: BALL_RADIUS,
     type: 'edge',
     graphics: leftWall
 });
 
 platforms.push({
-    x: GAME_WIDTH - BALL_RADIUS,
-    y: -WALL_HEIGHT,
-    width: BALL_RADIUS,
-    height: WALL_HEIGHT + GAME_HEIGHT,
+    x1: GAME_WIDTH - BALL_RADIUS/2,
+    y1: -WALL_HEIGHT,
+    x2: GAME_WIDTH - BALL_RADIUS/2,
+    y2: GAME_HEIGHT,
+    thickness: BALL_RADIUS,
     type: 'edge',
     graphics: rightWall
 });
 
-// Resolve circle vs axis-aligned rect collision, push circle out and reflect velocity
-function resolveCircleRectCollision(circle, px, py, pw, ph) {
-    // nearest point on rect to circle center
-    const nearestX = Math.max(px, Math.min(circle.x, px + pw));
-    const nearestY = Math.max(py, Math.min(circle.y, py + ph));
-    let dx = circle.x - nearestX;
-    let dy = circle.y - nearestY;
+// Resolve circle vs line segment collision
+function resolveCircleLineCollision(circle, x1, y1, x2, y2, thickness) {
+    // Vector from line start to end
+    const lineX = x2 - x1;
+    const lineY = y2 - y1;
+    const lineLength = Math.sqrt(lineX * lineX + lineY * lineY);
+    
+    if (lineLength === 0) return false; // Zero-length line
+    
+    // Normalize line direction
+    const lineDirX = lineX / lineLength;
+    const lineDirY = lineY / lineLength;
+    
+    // Vector from line start to circle center
+    const toCircleX = circle.x - x1;
+    const toCircleY = circle.y - y1;
+    
+    // Project circle center onto line
+    const projection = toCircleX * lineDirX + toCircleY * lineDirY;
+    const clampedProjection = Math.max(0, Math.min(lineLength, projection));
+    
+    // Closest point on line segment to circle
+    const closestX = x1 + lineDirX * clampedProjection;
+    const closestY = y1 + lineDirY * clampedProjection;
+    
+    // Distance from circle to closest point
+    const dx = circle.x - closestX;
+    const dy = circle.y - closestY;
     const distSq = dx * dx + dy * dy;
-    if (distSq > BALL_RADIUS * BALL_RADIUS) return false;
-
+    const collisionRadius = BALL_RADIUS + thickness / 2;
+    
+    if (distSq >= collisionRadius * collisionRadius) return false; // No collision
+    
     const dist = Math.sqrt(distSq) || 0.0001;
-    const overlap = BALL_RADIUS - dist;
-
-    // normal from rect -> circle
+    const overlap = collisionRadius - dist;
+    
+    // Normal from line to circle
     const nx = dx / dist;
     const ny = dy / dist;
-
-    // separate the ball so it no longer intersects
+    
+    // Separate the ball
     circle.x += nx * overlap;
     circle.y += ny * overlap;
-
+    
     // Only apply impulse if moving into the surface
     const relVel = ballPhysics.velocityX * nx + ballPhysics.velocityY * ny;
     if (relVel < 0) {
@@ -269,12 +316,12 @@ function resolveCircleRectCollision(circle, px, py, pw, ph) {
         ballPhysics.velocityX -= impulse * nx;
         ballPhysics.velocityY -= impulse * ny;
     }
-
-    // if normal points mostly up, treat as grounded contact
+    
+    // If normal points mostly up, treat as grounded contact
     if (ny < -0.5) {
         ballPhysics.isGrounded = true;
     }
-
+    
     return true;
 }
 
@@ -298,6 +345,9 @@ window.addEventListener('keydown', (e) => {
     } else if (key === ' ') {
         e.preventDefault();
         keys.space = true;
+    } else if (key === 'u') {
+        // Secret hotkey to reverse gravity
+        gravityDirection *= -1;
     }
 });
 
@@ -317,7 +367,7 @@ window.addEventListener('keyup', (e) => {
 // Game loop
 app.ticker.add(() => {
     // Apply gravity
-    ballPhysics.velocityY += GRAVITY;
+    ballPhysics.velocityY += GRAVITY * gravityDirection;
 
     // Apply friction and momentum to horizontal movement (only when grounded)
     if (ballPhysics.isGrounded) {
@@ -343,9 +393,9 @@ app.ticker.add(() => {
         circle.x += stepVelX;
         circle.y += stepVelY;
         
-        // Check collision with all platforms in each substep
+        // Check collision with all platforms (line segments) in each substep
         for (let platform of platforms) {
-            resolveCircleRectCollision(circle, platform.x, platform.y, platform.width, platform.height);
+            resolveCircleLineCollision(circle, platform.x1, platform.y1, platform.x2, platform.y2, platform.thickness);
         }
     }
 
