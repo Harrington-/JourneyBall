@@ -34,6 +34,30 @@ body {
     min-height: 0;
 }
 
+#scoreDisplay {
+    color: #fff;
+    font-size: 1.1rem;
+    margin: 0;
+    padding: 15px 0;
+    text-align: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+#scoreDisplay p {
+    margin: 5px 0;
+}
+
+#scoreDisplay strong {
+    color: #1099bb;
+}
+
+#scoreDisplay span {
+    color: #00d4ff;
+    font-weight: 700;
+}
+
 #gameControls {
     color: #ccc;
     font-size: 1rem;

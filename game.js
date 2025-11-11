@@ -73,6 +73,24 @@ const ballPhysics = {
     groundY: GAME_HEIGHT - BALL_RADIUS - 50 // Platform at bottom
 };
 
+// Score tracking
+let bestHeight = 0;
+
+// Get DOM elements for score display
+const currentHeightDisplay = document.getElementById('currentHeight');
+const bestHeightDisplay = document.getElementById('bestHeight');
+
+// Camera properties
+const camera = {
+    y: 0,
+    targetY: 0,
+    smoothing: 0.001
+};
+
+// Create a world container that will hold everything (for camera control)
+const world = new PIXI.Container();
+app.stage.addChild(world);
+
 // Create a container for the ball so we can rotate it
 const circle = new PIXI.Container();
 const ballShape = new PIXI.Graphics();
@@ -89,8 +107,8 @@ circle.addChild(ballShape);
 circle.x = GAME_WIDTH / 2;
 circle.y = GAME_HEIGHT / 2;
 
-// Add circle to stage
-app.stage.addChild(circle);
+// Add circle to world
+world.addChild(circle);
 
 // Platforms array to store collision data
 const platforms = [];
@@ -107,9 +125,9 @@ const platforms = [];
 
 // Level loader function
 function loadLevelFromCSV(csvData) {
-    // Clear existing platforms from stage (but keep the ball)
+    // Clear existing platforms from world (but keep the ball)
     for (let platform of platforms) {
-        app.stage.removeChild(platform.graphics);
+        world.removeChild(platform.graphics);
     }
     platforms.length = 0;
     
@@ -133,7 +151,7 @@ function loadLevelFromCSV(csvData) {
         platformGraphics.drawRect(x, y, width, height);
         platformGraphics.endFill();
         
-        app.stage.addChild(platformGraphics);
+        world.addChild(platformGraphics);
         
         // Store platform collision data
         platforms.push({
@@ -150,7 +168,6 @@ function loadLevelFromCSV(csvData) {
 // Default level (perimeter platforms)
 const defaultLevel = `# Level 1 - Perimeter
 0,1030,1920,50,edge
-0,0,1920,20,edge
 0,0,20,1080,edge
 1900,0,20,1080,edge
 # Platforms
@@ -160,10 +177,67 @@ const defaultLevel = `# Level 1 - Perimeter
 810,600,300,20,platform
 250,450,300,20,platform
 1370,450,300,20,platform
-810,300,300,20,platform`;
+810,300,300,20,platform
+250,150,300,20,platform
+1370,150,300,20,platform
+810,0,300,20,platform
+250,-150,300,20,platform
+1370,-150,300,20,platform
+810,-300,300,20,platform
+250,-450,300,20,platform
+1370,-450,300,20,platform
+810,-600,300,20,platform
+250,-750,300,20,platform
+1370,-750,300,20,platform
+810,-900,300,20,platform
+250,-1050,300,20,platform
+1370,-1050,300,20,platform
+810,-1200,300,20,platform
+250,-1350,300,20,platform
+1370,-1350,300,20,platform
+810,-1500,300,20,platform
+250,-1650,300,20,platform
+1370,-1650,300,20,platform
+810,-1800,300,20,platform
+250,-1950,300,20,platform
+1370,-1950,300,20,platform
+810,-2100,300,20,platform`;
 
 // Load the default level
 loadLevelFromCSV(defaultLevel);
+
+// Create permanent vertical walls that extend infinitely
+const WALL_HEIGHT = 100000; // Very tall walls
+const leftWall = new PIXI.Graphics();
+leftWall.beginFill(EDGE_COLOR);
+leftWall.drawRect(0, -WALL_HEIGHT, BALL_RADIUS, WALL_HEIGHT + GAME_HEIGHT);
+leftWall.endFill();
+world.addChild(leftWall);
+
+const rightWall = new PIXI.Graphics();
+rightWall.beginFill(EDGE_COLOR);
+rightWall.drawRect(GAME_WIDTH - BALL_RADIUS, -WALL_HEIGHT, BALL_RADIUS, WALL_HEIGHT + GAME_HEIGHT);
+rightWall.endFill();
+world.addChild(rightWall);
+
+// Add permanent walls to platforms array for collision
+platforms.push({
+    x: 0,
+    y: -WALL_HEIGHT,
+    width: BALL_RADIUS,
+    height: WALL_HEIGHT + GAME_HEIGHT,
+    type: 'edge',
+    graphics: leftWall
+});
+
+platforms.push({
+    x: GAME_WIDTH - BALL_RADIUS,
+    y: -WALL_HEIGHT,
+    width: BALL_RADIUS,
+    height: WALL_HEIGHT + GAME_HEIGHT,
+    type: 'edge',
+    graphics: rightWall
+});
 
 // Resolve circle vs axis-aligned rect collision, push circle out and reflect velocity
 function resolveCircleRectCollision(circle, px, py, pw, ph) {
@@ -279,6 +353,23 @@ app.ticker.add(() => {
     // The angle increment is proportional to the distance traveled divided by the radius
     // Negative sign for left, positive for right
     circle.rotation += ballPhysics.velocityX / BALL_RADIUS;
+
+    // Simple camera: keep ball centered vertically in screen
+    camera.y = circle.y - GAME_HEIGHT / 2;
+    
+    // Apply camera position to world
+    world.y = -camera.y;
+
+    // Update score display
+    // Height is calculated as distance from starting position (inverted Y axis)
+    const currentHeight = Math.max(0, Math.round(GAME_HEIGHT - circle.y));
+    currentHeightDisplay.textContent = currentHeight;
+    
+    // Update best height
+    if (currentHeight > bestHeight) {
+        bestHeight = currentHeight;
+        bestHeightDisplay.textContent = bestHeight;
+    }
 
     // Handle jumping (after collision checks so isGrounded is accurate)
     if (keys.space && ballPhysics.isGrounded && !spacePreviouslyPressed) {
