@@ -45,6 +45,10 @@ body {
     background-color: rgba(0, 0, 0, 0.3);
 }
 
+#gameControls p {
+    margin: 5px 0;
+}
+
 #gameControls strong {
     color: #1099bb;
 }
