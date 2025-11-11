@@ -34,6 +34,21 @@ body {
     min-height: 0;
 }
 
+#gameControls {
+    color: #ccc;
+    font-size: 1rem;
+    margin: 0;
+    padding: 10px 0;
+    text-align: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+#gameControls strong {
+    color: #1099bb;
+}
+
 #gameFooter {
     color: #aaa;
     font-size: 0.9rem;

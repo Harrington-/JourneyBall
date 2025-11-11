@@ -10,6 +10,7 @@ const ACCELERATION = 0.8;
 const MAX_VELOCITY_X = 12;
 const JUMP_STRENGTH = 16;
 const BALL_RADIUS = 20;
+const RESTITUTION = 0.3; // bounce factor (0 = no bounce, 1 = perfect elastic)
 
 // Gravity direction for debugging (1 = down, -1 = up)
 let gravityDirection = 1;
@@ -91,44 +92,127 @@ circle.y = GAME_HEIGHT / 2;
 // Add circle to stage
 app.stage.addChild(circle);
 
-// Create the perimeter platforms
-const floorLimitBox = new PIXI.Graphics();
-floorLimitBox.beginFill(EDGE_COLOR);
-floorLimitBox.drawRect(0, ballPhysics.groundY + BALL_RADIUS, GAME_WIDTH, 50);
-floorLimitBox.endFill();
+// Platforms array to store collision data
+const platforms = [];
 
-const ceilingLimitBox = new PIXI.Graphics();
-ceilingLimitBox.beginFill(EDGE_COLOR);
-ceilingLimitBox.drawRect(0, 0, GAME_WIDTH, BALL_RADIUS);
-ceilingLimitBox.endFill();
+// CSV Level Format:
+// x,y,width,height,type
+// type: "platform" or "edge"
+// Example CSV for level 1:
+// 0,1030,1920,50,edge
+// 960,900,300,20,platform
+// 400,750,300,20,platform
+// 1520,750,300,20,platform
+// 960,600,300,20,platform
 
-const leftLimitBox = new PIXI.Graphics();
-leftLimitBox.beginFill(EDGE_COLOR);
-leftLimitBox.drawRect(0, 0, BALL_RADIUS, GAME_HEIGHT);
-leftLimitBox.endFill();
+// Level loader function
+function loadLevelFromCSV(csvData) {
+    // Clear existing platforms from stage (but keep the ball)
+    for (let platform of platforms) {
+        app.stage.removeChild(platform.graphics);
+    }
+    platforms.length = 0;
+    
+    // Parse CSV
+    const lines = csvData.trim().split('\n');
+    for (let line of lines) {
+        if (line.trim() === '' || line.trim().startsWith('#')) continue; // Skip empty lines and comments
+        
+        const parts = line.split(',').map(p => p.trim());
+        if (parts.length < 5) continue;
+        
+        const x = parseFloat(parts[0]);
+        const y = parseFloat(parts[1]);
+        const width = parseFloat(parts[2]);
+        const height = parseFloat(parts[3]);
+        const type = parts[4];
+        
+        // Create platform graphics
+        const platformGraphics = new PIXI.Graphics();
+        platformGraphics.beginFill(EDGE_COLOR);
+        platformGraphics.drawRect(x, y, width, height);
+        platformGraphics.endFill();
+        
+        app.stage.addChild(platformGraphics);
+        
+        // Store platform collision data
+        platforms.push({
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            type: type,
+            graphics: platformGraphics
+        });
+    }
+}
 
-const rightLimitBox = new PIXI.Graphics();
-rightLimitBox.beginFill(EDGE_COLOR);
-rightLimitBox.drawRect(GAME_WIDTH - BALL_RADIUS, 0, BALL_RADIUS, GAME_HEIGHT);
-rightLimitBox.endFill();
+// Default level (perimeter platforms)
+const defaultLevel = `# Level 1 - Perimeter
+0,1030,1920,50,edge
+0,0,1920,20,edge
+0,0,20,1080,edge
+1900,0,20,1080,edge
+# Platforms
+960,900,300,20,platform
+400,750,300,20,platform
+1520,750,300,20,platform
+960,600,300,20,platform
+400,450,300,20,platform
+1520,450,300,20,platform
+960,300,300,20,platform`;
 
-// Add floor to stage
-app.stage.addChild(floorLimitBox);
-app.stage.addChild(ceilingLimitBox);
-app.stage.addChild(leftLimitBox);
-app.stage.addChild(rightLimitBox);
+// Load the default level
+loadLevelFromCSV(defaultLevel);
+
+// Resolve circle vs axis-aligned rect collision, push circle out and reflect velocity
+function resolveCircleRectCollision(circle, px, py, pw, ph) {
+    // nearest point on rect to circle center
+    const nearestX = Math.max(px, Math.min(circle.x, px + pw));
+    const nearestY = Math.max(py, Math.min(circle.y, py + ph));
+    let dx = circle.x - nearestX;
+    let dy = circle.y - nearestY;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > BALL_RADIUS * BALL_RADIUS) return false;
+
+    const dist = Math.sqrt(distSq) || 0.0001;
+    const overlap = BALL_RADIUS - dist;
+
+    // normal from rect -> circle
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // separate the ball so it no longer intersects
+    circle.x += nx * overlap;
+    circle.y += ny * overlap;
+
+    // Only apply impulse if moving into the surface
+    const relVel = ballPhysics.velocityX * nx + ballPhysics.velocityY * ny;
+    if (relVel < 0) {
+        // Use dynamic restitution: 0.8 when space held, 0 otherwise
+        const currentRestitution = keys.space ? 0.8 : 0;
+        const impulse = (1 + currentRestitution) * relVel;
+        ballPhysics.velocityX -= impulse * nx;
+        ballPhysics.velocityY -= impulse * ny;
+    }
+
+    // if normal points mostly up, treat as grounded contact
+    if (ny < -0.5) {
+        ballPhysics.isGrounded = true;
+    }
+
+    return true;
+}
 
 // Key state
 const keys = {
     a: false,
     d: false,
-    space: false,
-    f: false
+    space: false
 };
 
 // Track if space was previously pressed to prevent multiple jumps
 let spacePreviouslyPressed = false;
-let fPreviouslyPressed = false;
 
 // Key press handlers
 window.addEventListener('keydown', (e) => {
@@ -140,8 +224,6 @@ window.addEventListener('keydown', (e) => {
     } else if (key === ' ') {
         e.preventDefault();
         keys.space = true;
-    } else if (key === 'f') {
-        keys.f = true;
     }
 });
 
@@ -155,22 +237,13 @@ window.addEventListener('keyup', (e) => {
         e.preventDefault();
         keys.space = false;
         spacePreviouslyPressed = false;
-    } else if (key === 'f') {
-        keys.f = false;
-        fPreviouslyPressed = false;
     }
 });
 
 // Game loop
 app.ticker.add(() => {
-    // Handle gravity reversal (debugging)
-    if (keys.f && !fPreviouslyPressed) {
-        gravityDirection *= -1;
-        fPreviouslyPressed = true;
-    }
-
-    // Apply gravity with direction
-    ballPhysics.velocityY += GRAVITY * gravityDirection;
+    // Apply gravity
+    ballPhysics.velocityY += GRAVITY;
 
     // Apply friction and momentum to horizontal movement (only when grounded)
     if (ballPhysics.isGrounded) {
@@ -185,42 +258,27 @@ app.ticker.add(() => {
     }
     // When in air, maintain momentum (no friction or acceleration)
 
-    // Update position
-    circle.x += ballPhysics.velocityX;
-    circle.y += ballPhysics.velocityY;
+    // Update position with sub-stepping to prevent tunneling through objects
+    const substeps = Math.max(1, Math.ceil(Math.max(Math.abs(ballPhysics.velocityX), Math.abs(ballPhysics.velocityY)) / 10));
+    const stepVelX = ballPhysics.velocityX / substeps;
+    const stepVelY = ballPhysics.velocityY / substeps;
+    
+    ballPhysics.isGrounded = false;
+    
+    for (let i = 0; i < substeps; i++) {
+        circle.x += stepVelX;
+        circle.y += stepVelY;
+        
+        // Check collision with all platforms in each substep
+        for (let platform of platforms) {
+            resolveCircleRectCollision(circle, platform.x, platform.y, platform.width, platform.height);
+        }
+    }
 
     // Rotate the ball to simulate rolling
     // The angle increment is proportional to the distance traveled divided by the radius
     // Negative sign for left, positive for right
     circle.rotation += ballPhysics.velocityX / BALL_RADIUS;
-
-    // Handle collisions and update isGrounded based on actual contact
-    ballPhysics.isGrounded = false;
-
-    // Handle ground collision
-    if (circle.y >= ballPhysics.groundY) {
-        circle.y = ballPhysics.groundY;
-        ballPhysics.velocityY = 0;
-        ballPhysics.isGrounded = true;
-    }
-
-    // Handle ceiling collision
-    if (circle.y <= BALL_RADIUS * 2) {
-        circle.y = BALL_RADIUS * 2;
-        ballPhysics.velocityY = 0;
-    }
-
-    // Handle left wall collision
-    if (circle.x <= BALL_RADIUS * 2) {
-        circle.x = BALL_RADIUS * 2;
-        ballPhysics.velocityX = Math.abs(ballPhysics.velocityX) * 0.5; // Bounce
-    }
-
-    // Handle right wall collision
-    if (circle.x >= GAME_WIDTH - BALL_RADIUS * 2) {
-        circle.x = GAME_WIDTH - BALL_RADIUS * 2;
-        ballPhysics.velocityX = -Math.abs(ballPhysics.velocityX) * 0.5; // Bounce
-    }
 
     // Handle jumping (after collision checks so isGrounded is accurate)
     if (keys.space && ballPhysics.isGrounded && !spacePreviouslyPressed) {
