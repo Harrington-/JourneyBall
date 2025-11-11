@@ -63,7 +63,7 @@ window.addEventListener('resize', () => {
     resizeCanvas();
 });
 
-// Intercept page refresh/close attempts when ball is falling
+// Save state when page unloads if ball is falling
 window.addEventListener('beforeunload', (e) => {
     if (!ballPhysics.isGrounded) {
         // Save current state to sessionStorage
@@ -75,11 +75,6 @@ window.addEventListener('beforeunload', (e) => {
             seed: levelSeed
         };
         sessionStorage.setItem('journeyBallState', JSON.stringify(state));
-        
-        // Show "You're Still Falling" message
-        e.preventDefault();
-        e.returnValue = "You're Still Falling";
-        return "You're Still Falling";
     }
 });
 
